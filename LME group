@@ -1,0 +1,51 @@
+import os
+import re
+
+import requests
+from bs4 import BeautifulSoup
+
+def get_pdf_url(doi_url):
+    if not isinstance(doi_url, str):
+        raise ValueError("你应该是把列表或者元组传进来了")
+    if len(doi_url) < 2:
+        raise ValueError("你应该是把字符串当列表遍历了")
+    pdf_url = None
+    resp = requests.post("https://sci-hub.se",
+                         data={
+                             "sci-hub-plugin-check": "",
+                             "request": doi_url
+                         })
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+    iframe = soup.find("iframe", src=re.compile(r"\.pdf"))
+    if iframe:
+        pdf_url = iframe.get("src")
+    else:
+        print(f"DOI {doi_url} 检索PDF连结失败")
+        return None, None
+    if not pdf_url.startswith("http"):
+        pdf_url = "http:" + pdf_url
+    if "#" in pdf_url:
+        pdf_url = pdf_url[:pdf_url.index("#")]
+    title = soup.title.text  # 获取paper的titile作为文件名
+    matched_title = re.findall(r".*?\| +(.*) +\|.*", title)
+    if matched_title:
+        title = matched_title[0]
+    return pdf_url, title
+
+
+def download_pdf(url, file_name, save_path=''):        #输入文件夹地址
+    # 去掉文件名里的特殊字符
+    file_name = re.sub(r"[^\w ]", "", file_name) + ".pdf"
+    pdf_content = requests.get(url).content
+    with open(os.path.join(save_path, file_name), "wb") as f:
+        f.write(pdf_content)
+    pass
+
+
+for doi in x:
+    url, title = get_pdf_url(doi)
+    if not url:
+        print(f"{doi} 找不到下载连结")
+        continue
+    download_pdf(url, title)
